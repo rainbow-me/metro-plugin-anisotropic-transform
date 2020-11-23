@@ -6,7 +6,7 @@
   "license": "MIT",
   "private": false,
   "scripts": {
-    "build": "babel src --out-dir dist && rm -rf node_modules"
+    "build": "yarn && babel src --out-dir dist && rm -rf node_modules"
   },
   "devDependencies": {
     "@babel/cli": "^7.12.7",
@@ -19,5 +19,6 @@
     "prettier": "^2.2.0",
     "react": "^17.0.1",
     "react-native": "^0.63.3"
-  }
+  },
+  "dependencies": {}
 }

@@ -1,7 +1,9 @@
-import * as React from "react";
-import { View, Text } from "react-native";
+import * as React from 'react';
+import { View } from 'react-native';
 
-import { Evil } from "SimpleEvil";
+import { Evil } from 'SimpleEvil';
+
+import { Sensitive } from './components';
 
 export default function App() {
   return (
@@ -12,8 +14,11 @@ export default function App() {
         alignItems: "center",
       }}
     >
+      <Sensitive
+        style={{ backgroundColor: 'green' }}
+        sensitiveProp="Some sensitive prop."
+      />
       <Evil />
-      <Text>Universal React with Expo</Text>
     </View>
   );
 }
