@@ -1,0 +1,8 @@
+{
+  "expo": {
+    "packagerOpts": {
+      "sourceExts": ["js", "jsx", "less"],
+      "transformer": "./metro-plugin-anisotropic-transform.js"
+    }
+  }
+}
