@@ -1,5 +1,6 @@
 var minor = require("semver/functions/minor");
 var path = require("path");
+var madge = require("madge");
 
 var upstreamTransformer = null;
 
@@ -26,13 +27,24 @@ if (reactNativeMinorVersion >= 59) {
   };
 }
 
-module.exports.transform = function(src, filename, options) {
+module.exports.transform = async function (src, filename, options) {
   if (typeof src === "object") {
     // handle RN >= 0.46
     ({ src, filename, options } = src);
   }
 
+  const result = await madge(filename, {
+    includeNpm: true,
+    fileExtensions: ['js', 'jsx', 'ts', 'tsx'],
+    detectiveOptions: {
+      es6: {
+        mixedImports: true
+      }
+    },
+  })
   console.log(filename);
+  console.log(result.obj());
 
   return upstreamTransformer.transform({ src, filename, options });
 };
+
