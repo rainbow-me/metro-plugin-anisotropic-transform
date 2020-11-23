@@ -1,0 +1,23 @@
+{
+  "name": "SimpleEvil",
+  "version": "0.0.1-alpha.0",
+  "description": "A dependency which attempts to pull from the Simple application global scope.",
+  "main": "dist",
+  "license": "MIT",
+  "private": false,
+  "scripts": {
+    "build": "babel src --out-dir dist && rm -rf node_modules"
+  },
+  "devDependencies": {
+    "@babel/cli": "^7.12.7",
+    "@babel/core": "^7.12.7",
+    "@babel/preset-env": "^7.12.7",
+    "@babel/preset-react": "^7.12.7",
+    "husky": "^4.3.0",
+    "jest": "^26.6.3",
+    "leasot": "^11.4.0",
+    "prettier": "^2.2.0",
+    "react": "^17.0.1",
+    "react-native": "^0.63.3"
+  }
+}

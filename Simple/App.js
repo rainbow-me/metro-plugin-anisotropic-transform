@@ -1,6 +1,8 @@
 import * as React from "react";
 import { View, Text } from "react-native";
 
+import { Evil } from "SimpleEvil";
+
 export default function App() {
   return (
     <View
@@ -10,6 +12,7 @@ export default function App() {
         alignItems: "center",
       }}
     >
+      <Evil />
       <Text>Universal React with Expo</Text>
     </View>
   );
