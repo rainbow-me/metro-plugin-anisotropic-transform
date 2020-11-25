@@ -1,6 +1,7 @@
 var minor = require("semver/functions/minor");
 var path = require("path");
 var madge = require("madge");
+var appRootPath = require("app-root-path");
 
 var upstreamTransformer = null;
 
@@ -27,13 +28,23 @@ if (reactNativeMinorVersion >= 59) {
   };
 }
 
+function isSubDirectory(parent, dir) {
+  const relative = path.relative(parent, dir);
+  return relative && !relative.startsWith('..') && !path.isAbsolute(relative);
+}
+
+function normalize(parent, child) {
+  return path.normalize(`${parent}${path.sep}${child}`);
+}
+
+
 module.exports.transform = async function (src, filename, options) {
   if (typeof src === "object") {
     // handle RN >= 0.46
     ({ src, filename, options } = src);
   }
 
-  const result = await madge(filename, {
+  const {...madged} = (await madge(filename, {
     includeNpm: true,
     fileExtensions: ['js', 'jsx', 'ts', 'tsx'],
     detectiveOptions: {
@@ -41,9 +52,19 @@ module.exports.transform = async function (src, filename, options) {
         mixedImports: true
       }
     },
-  })
-  console.log(filename);
-  console.log(result.obj());
+  })).obj();
+
+  const nodeModulesDir = path.resolve(`${appRootPath}`, 'node_modules');
+  const file = normalize(`${appRootPath}`, filename);
+
+  if (isSubDirectory(nodeModulesDir, file)) {
+    Object.keys(madged).forEach((e) => {
+      const parent = normalize(path.dirname(file), e);
+      if (!isSubDirectory(nodeModulesDir, parent)) {
+        console.error(`⚠️ ${file} attempted to reference ${parent}!`);
+      }
+    });
+  }
 
   return upstreamTransformer.transform({ src, filename, options });
 };
