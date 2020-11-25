@@ -14,6 +14,7 @@
   },
   "scripts": {
     "start": "expo start",
+    "start-without-cache": "node scripts/start-without-cache",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo web",
