@@ -10,7 +10,7 @@
   },
   "devDependencies": {
     "@babel/core": "7.9.0",
-    "metro-plugin-anisotropic-transform": "../"
+    "metro-plugin-anisotropic-transform": "https://github.com/cawfree/metro-plugin-anisotropic-transform"
   },
   "scripts": {
     "start": "expo start",
