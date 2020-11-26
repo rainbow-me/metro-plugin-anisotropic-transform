@@ -1,0 +1,7 @@
+{
+  "name": "metro-plugin-anisotropic-transform",
+  "version": "1.0.0",
+  "main": "index.js",
+  "repository": "https://github.com/cawfree/metro-plugin-anisotropic-transform",
+  "license": "MIT"
+}

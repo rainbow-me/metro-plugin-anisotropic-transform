@@ -4,6 +4,7 @@
     "app-root-path": "^3.0.0",
     "expo": "~39.0.0",
     "madge": "^3.12.0",
+    "metro-plugin-anisotropic-transform": "../",
     "react": "~16.13.0",
     "react-dom": "~16.13.0",
     "react-native": "https://github.com/expo/react-native/archive/sdk-39.0.2.tar.gz",
