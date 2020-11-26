@@ -49,10 +49,16 @@ const defaultOptions = {
             mixedImports: true
           }
         },
-      },
+      }, 
       // Dependencies which depend upon the root project
       // are permitted to assert such a dependency.
       cyclicDependents: /a^/, /* by default, do not permit anything */
+      resolve: ({ type, ...extras }) => {
+        if (type === 'cyclicDependents') {
+          const {target, referrer} = extras;
+          throw new Error(`${name}: Detected a cyclic dependency.  (${referrer} => ${target})`);
+        }
+      },
     },
   },
 };
@@ -67,7 +73,11 @@ module.exports.transform = async function anisotropicTransform(src, filename, op
   const opts = deepmerge(defaultOptions, options);
   const { customTransformOptions } = opts;
   const { [name]: anisotropicTransformOptions } = customTransformOptions;
-  const { madge: madgeOptions, cyclicDependents } = anisotropicTransformOptions;
+  const {
+    madge: madgeOptions,
+    cyclicDependents,
+    resolve,
+  } = anisotropicTransformOptions;
 
   const nodeModulesDir = path.resolve(`${appRootPath}`, "node_modules");
   const file = normalize(`${appRootPath}`, filename);
@@ -76,9 +86,12 @@ module.exports.transform = async function anisotropicTransform(src, filename, op
     const madged = (await madge(filename, madgeOptions)).obj();
     Object.keys(madged).forEach((e) => {
       const parent = normalize(path.dirname(file), e);
-      if (!isSubDirectory(nodeModulesDir, parent)) {
-        const enabled = !!file.match(cyclicDependents);
-        !enabled && console.error(`⚠️  ${file} -> ${parent}!`);
+      if (!isSubDirectory(nodeModulesDir, parent) && !file.match(cyclicDependents)) {
+        resolve({
+          type: 'cyclicDependents',
+          target: parent,
+          referrer: file,
+        });
       }
     });
   }
