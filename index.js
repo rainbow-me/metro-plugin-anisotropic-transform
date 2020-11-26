@@ -49,7 +49,10 @@ const defaultOptions = {
             mixedImports: true
           }
         },
-      }
+      },
+      // Dependencies which depend upon the root project
+      // are permitted to assert such a dependency.
+      cyclicDependents: /a^/, /* by default, do not permit anything */
     },
   },
 };
@@ -60,12 +63,11 @@ module.exports.transform = async function anisotropicTransform(src, filename, op
     // handle RN >= 0.46
     ({ src, filename, options } = src);
   }
-
+  
   const opts = deepmerge(defaultOptions, options);
   const { customTransformOptions } = opts;
   const { [name]: anisotropicTransformOptions } = customTransformOptions;
-  const { madge: madgeOptions } = anisotropicTransformOptions;
-
+  const { madge: madgeOptions, cyclicDependents } = anisotropicTransformOptions;
 
   const nodeModulesDir = path.resolve(`${appRootPath}`, "node_modules");
   const file = normalize(`${appRootPath}`, filename);
@@ -75,7 +77,8 @@ module.exports.transform = async function anisotropicTransform(src, filename, op
     Object.keys(madged).forEach((e) => {
       const parent = normalize(path.dirname(file), e);
       if (!isSubDirectory(nodeModulesDir, parent)) {
-        console.error(`⚠️  ${file} -> ${parent}!`);
+        const enabled = !!file.match(cyclicDependents);
+        !enabled && console.error(`⚠️  ${file} -> ${parent}!`);
       }
     });
   }
