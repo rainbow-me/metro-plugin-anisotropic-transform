@@ -4035,6 +4035,10 @@ metro-minify-uglify@0.58.0:
 
 metro-plugin-anisotropic-transform@../:
   version "1.0.0"
+  dependencies:
+    app-root-path "^3.0.0"
+    madge "^3.12.0"
+    semver "^7.3.2"
 
 metro-react-native-babel-preset@0.58.0:
   version "0.58.0"
