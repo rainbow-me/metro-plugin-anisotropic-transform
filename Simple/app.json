@@ -1,8 +1,0 @@
-{
-  "expo": {
-    "packagerOpts": {
-      "sourceExts": ["js", "jsx"],
-      "transformer": "./metro.transform.js"
-    }
-  }
-}
