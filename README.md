@@ -1,14 +1,14 @@
 # metro-plugin-anisotropic-transform
 ⚛️  🧲 Intercept and mutate runtime dependency resolution.
 
-## Motivation
+## 💪 Motivation
 [`metro-plugin-anisotropic-transform`](.) is a transform plugin for [**React Native**](https://reactnative.dev)'s [**Metro Bundler**](https://github.com/facebook/metro). It is designed to inspect the relationships that exist between dependencies; specifically, those in the `node_modules/` directory which make a cyclic dependence to the root project.
 
 This is designed to circumvent issues where:
   - Preventing cyclic dependencies on the root project, which can lead to drastically increased installation time.
   - Derisking the possibility of library dependencies relying upon runtime functionality exported by the root project.
 
-### How does it work?
+### 🤔 How does it work?
 Applications built using [**React Native**](https://reactnative.dev) are forced to resolve **all** module dependencies at bundle time. This is because unlike the [**Node.js**](https://nodejs.org/en/) ecosystem, the entire dependency map of the compiled application must be resolved prior to app distrbution in order translate into a fixed application bundle that can be transported.
 
 This makes the following impact on the compilation process:
@@ -18,9 +18,9 @@ This makes the following impact on the compilation process:
 
 [`metro-plugin-anisotropic-transform`](.) utilizes these restrictions in library resolution to compare and handle relationships between the core application and children of the `node_modules` directory, and in these cases, resolve appropriately. 
 
-## Guide
+## 📚 Guide
 
-### 1. Installing
+### 🚀 1. Installing
 
 Using [**Yarn**](https://yarnpkg.com):
 
@@ -28,7 +28,7 @@ Using [**Yarn**](https://yarnpkg.com):
 yarn add --dev metro-plugin-anisotropic platform
 ```
 
-### 2. Creating a `metro.transform.js`
+### 📝 2. Creating a `metro.transform.js`
 
 We'll create our own custom [**Metro**](https://github.com/facebook/metro) transform to invoke the anisotropic transform.
 
@@ -58,7 +58,7 @@ Inside `customTransformOptions`, we declare a child object under the key `metro-
 
 > **Note:** In production environments, it is imported to declare the **full system path** to the resolved dependency. This is because bad actors could exploit a simple directory structure to create a _technically allowable_ path, i.e. `node_modules/evil-dangerous-package/node_modules/expo/AppEntry.js`.
 
-### 3. Applying the Transform
+### 3. ♾️ Applying the Transform
 
 Finally, you'll need to update your `metro.config.js` to invoke the `metro.transform.js` during the bundle phase:
 
@@ -87,7 +87,7 @@ And that's everything! Now whenever you rebundle your application, your applicat
 > ⚠️  **Important!** Whenever you apply any changes to your bundler configuration, you **must** clear the cache by calling `react-native start --reset-cache`.
 
 
-## Options
+## ⚙️ Options
 
 [`babel-plugin-anisotropic-transform`](.) defaults to the following configuration:
 
@@ -120,6 +120,6 @@ A [`RegExp`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/G
 ### `resolve`
 A function called when the anisotropic platform detects a sensitive relationship. By default, this is configured to `throw` and prevent the bundler from continuing.
 
-## License
+## 🌈 License
 [**MIT**](./LICENSE)
 
