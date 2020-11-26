@@ -2,8 +2,10 @@ const minor = require("semver/functions/minor");
 const path = require("path");
 const madge = require("madge");
 const appRootPath = require("app-root-path");
+const deepmerge = require("deepmerge");
 
-const {version} = require("react-native/package.json");
+const { name } = require("./package.json");
+const { version } = require("react-native/package.json");
 const reactNativeMinorVersion = minor(version);
 
 const getUpstreamTransformer = () => {
@@ -36,6 +38,22 @@ function normalize(parent, child) {
   return path.normalize(`${parent}${path.sep}${child}`);
 }
 
+const defaultOptions = {
+  customTransformOptions: {
+    [name]: {
+      madge: {
+        includeNpm: true,
+        fileExtensions: ["js", "jsx", "ts", "tsx"],
+        detectiveOptions: {
+          es6: {
+            mixedImports: true
+          }
+        },
+      }
+    },
+  },
+};
+
 
 module.exports.transform = async function anisotropicTransform(src, filename, options) {
   if (typeof src === "object") {
@@ -43,20 +61,17 @@ module.exports.transform = async function anisotropicTransform(src, filename, op
     ({ src, filename, options } = src);
   }
 
-  const {...madged} = (await madge(filename, {
-    includeNpm: true,
-    fileExtensions: ['js', 'jsx', 'ts', 'tsx'],
-    detectiveOptions: {
-      es6: {
-        mixedImports: true
-      }
-    },
-  })).obj();
+  const opts = deepmerge(defaultOptions, options);
+  const { customTransformOptions } = opts;
+  const { [name]: anisotropicTransformOptions } = customTransformOptions;
+  const { madge: madgeOptions } = anisotropicTransformOptions;
 
-  const nodeModulesDir = path.resolve(`${appRootPath}`, 'node_modules');
+
+  const nodeModulesDir = path.resolve(`${appRootPath}`, "node_modules");
   const file = normalize(`${appRootPath}`, filename);
 
   if (isSubDirectory(nodeModulesDir, file)) {
+    const madged = (await madge(filename, madgeOptions)).obj();
     Object.keys(madged).forEach((e) => {
       const parent = normalize(path.dirname(file), e);
       if (!isSubDirectory(nodeModulesDir, parent)) {
