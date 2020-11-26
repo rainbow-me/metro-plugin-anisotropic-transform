@@ -6,7 +6,7 @@ module.exports = (async () => {
   } = await getDefaultConfig();
   return {
     transformer: {
-      babelTransformerPath: require.resolve("metro-plugin-anisotropic-transform"),
+      babelTransformerPath: require.resolve("./metro.transform.js"),
     },
     resolver: {
       sourceExts: [...sourceExts],
