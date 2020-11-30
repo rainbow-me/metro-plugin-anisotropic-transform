@@ -25,7 +25,7 @@ This makes the following impact on the compilation process:
 Using [**Yarn**](https://yarnpkg.com):
 
 ```sh
-yarn add --dev metro-plugin-anisotropic platform
+yarn add --dev metro-plugin-anisotropic-transform
 ```
 
 ### 📝 2. Creating a `metro.transform.js`
