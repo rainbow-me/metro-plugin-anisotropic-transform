@@ -3,6 +3,7 @@ const path = require("path");
 const madge = require("madge");
 const appRootPath = require("app-root-path");
 const deepmerge = require("deepmerge");
+const glob = require("glob");
 
 const { name } = require("./package.json");
 const { version } = require("react-native/package.json");
@@ -57,8 +58,12 @@ const defaultOptions = {
       // are permitted to assert such a dependency.
       [TYPE_CYCLIC_DEPENDENTS]: /a^/, /* by default, do not permit anything */
       [TYPE_GLOBAL_SCOPE_FILTER]: {
-        // No resolution.
-        'react-native-keychain/index.js': null, // TODO: determine index dynamically, or populate the contents ourselves
+        // fetch all files
+        'react-native-keychain': {
+
+        },
+        //// No resolution.
+        //'react-native-keychain/index.js': null, // TODO: determine index dynamically, or populate the contents ourselves
       },
       resolve: ({ type, referrer, ...extras }) => {
         if (type === TYPE_CYCLIC_DEPENDENTS) {
@@ -103,13 +108,14 @@ module.exports.transform = async function anisotropicTransform(src, filename, op
       const parent = normalize(path.dirname(file), key);
 
       Object.entries(globalScopeFilter).forEach(([maybeDependentUpon, v]) => {
-        /* is dependent upon a filtered global scope */
-        const depends = madged
-          .depends(path.relative(file, path.resolve(nodeModulesDir, maybeDependentUpon)).substring(3)); // how to remove prefix ../ ?
+        const moduleDirectoryPath = path.resolve(nodeModulesDir, maybeDependentUpon);
+        const allFiles = glob.sync(`${moduleDirectoryPath}/**/*`);
 
-        if (depends.length) {
-          console.log({depends, file});
-        }
+        allFiles.map((e) => {
+          if (madged.depends(path.relative(file, e).substring(3)).length) {
+            console.warn('Detected bad dependency', file, 'on', maybeDependentUpon);
+          }
+        });
       });
       if (!isSubDirectory(nodeModulesDir, parent) && !file.match(cyclicDependents)) {
         resolve({
