@@ -131,6 +131,7 @@ A [`RegExp`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/G
 
 ### `globalScopeFilter`
 An object whose keys map to dependencies in your `node_modules` directory which are not permitted to be included by other dependencies. This is useful for preventing libraries from executing potentially priviledged functionality exported by another module.
+  - The values of this property are currently unused. For future proofing, consider using an empty object `{}`.
 
 ### `resolve`
 A function called when the anisotropic platform detects a sensitive relationship. By default, this is configured to `throw` and prevent the bundler from continuing.
