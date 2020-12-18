@@ -24,7 +24,7 @@ const getUpstreamTransformer = () => {
     const oldUpstreamTransformer = require("react-native/packager/transformer");
     return {
       transform: ({ src, filename, options }) =>
-        oldUpstreamTransformer.transform(src, filename, options),
+      oldUpstreamTransformer.transform(src, filename, options),
     };
   }
 };
@@ -37,6 +37,9 @@ function isSubDirectory(parent, dir) {
 function normalize(parent, child) {
   return path.normalize(`${parent}${path.sep}${child}`);
 }
+
+const TYPE_CYCLIC_DEPENDENTS = 'cyclicDependents';
+const TYPE_GLOBAL_SCOPE_FILTER = 'globalScopeFilter';
 
 const defaultOptions = {
   customTransformOptions: {
@@ -52,12 +55,20 @@ const defaultOptions = {
       }, 
       // Dependencies which depend upon the root project
       // are permitted to assert such a dependency.
-      cyclicDependents: /a^/, /* by default, do not permit anything */
-      resolve: ({ type, ...extras }) => {
-        if (type === 'cyclicDependents') {
-          const {target, referrer} = extras;
+      [TYPE_CYCLIC_DEPENDENTS]: /a^/, /* by default, do not permit anything */
+      [TYPE_GLOBAL_SCOPE_FILTER]: {
+        // No resolution.
+        'react-native-keychain/index.js': null, // TODO: determine index dynamically, or populate the contents ourselves
+      },
+      resolve: ({ type, referrer, ...extras }) => {
+        if (type === TYPE_CYCLIC_DEPENDENTS) {
+          const {target} = extras;
           throw new Error(`${name}: Detected a cyclic dependency.  (${referrer} => ${target})`);
+        } else if (type === TYPE_GLOBAL_SCOPE_FILTER) {
+          const {module} = extras;
+          throw new Error(`${name}: Detected disallowed dependence upon "${module}". (${referrer})`);
         }
+        throw new Error(`Encountered unimplemented type, "${type}".`);
       },
     },
   },
@@ -69,13 +80,14 @@ module.exports.transform = async function anisotropicTransform(src, filename, op
     // handle RN >= 0.46
     ({ src, filename, options } = src);
   }
-  
+
   const opts = deepmerge(defaultOptions, options);
   const { customTransformOptions } = opts;
   const { [name]: anisotropicTransformOptions } = customTransformOptions;
   const {
     madge: madgeOptions,
-    cyclicDependents,
+    [TYPE_CYCLIC_DEPENDENTS]: cyclicDependents,
+    [TYPE_GLOBAL_SCOPE_FILTER]: globalScopeFilter,
     resolve,
   } = anisotropicTransformOptions;
 
@@ -83,12 +95,25 @@ module.exports.transform = async function anisotropicTransform(src, filename, op
   const file = normalize(`${appRootPath}`, filename);
 
   if (isSubDirectory(nodeModulesDir, file)) {
-    const madged = (await madge(filename, madgeOptions)).obj();
-    Object.keys(madged).forEach((e) => {
-      const parent = normalize(path.dirname(file), e);
+    /* dependency graph */
+    const madged = await madge(filename, madgeOptions);
+    const keys = madged.obj();
+
+    Object.keys(keys).forEach((key) => {
+      const parent = normalize(path.dirname(file), key);
+
+      Object.entries(globalScopeFilter).forEach(([maybeDependentUpon, v]) => {
+        /* is dependent upon a filtered global scope */
+        const depends = madged
+          .depends(path.relative(file, path.resolve(nodeModulesDir, maybeDependentUpon)).substring(3)); // how to remove prefix ../ ?
+
+        if (depends.length) {
+          console.log({depends, file});
+        }
+      });
       if (!isSubDirectory(nodeModulesDir, parent) && !file.match(cyclicDependents)) {
         resolve({
-          type: 'cyclicDependents',
+          type: TYPE_CYCLIC_DEPENDENTS,
           target: parent,
           referrer: file,
         });

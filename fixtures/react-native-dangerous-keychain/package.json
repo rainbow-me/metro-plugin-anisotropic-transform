@@ -1,0 +1,10 @@
+{
+  "name": "react-native-dangerous-keychain",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "dependencies": {
+    "react-native": "^0.63.4",
+    "react-native-keychain": "^6.2.0"
+  }
+}
