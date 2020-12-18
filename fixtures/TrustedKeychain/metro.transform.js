@@ -6,6 +6,9 @@ module.exports.transform = function ({src, filename, options}) {
     customTransformOptions: {
       ['metro-plugin-anisotropic-transform']: {
         //cyclicDependents: /.+\/node_modules\/expo\/AppEntry\.js$/,
+        globalScopeFilter: {
+          'react-native-keychain': {},
+        },
       },
     },
   });
