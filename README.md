@@ -113,10 +113,10 @@ And that's everything! Now whenever you rebundle your application, your applicat
   resolve: ({ type, referrer, ...extras }) => {
     if (type === 'cyclicDependents') {
       const {target} = extras;
-      throw new Error(`Detected a cyclic dependency.  (${referrer} => ${target})`);
+      throw new Error(`${name}: Detected a cyclic dependency.  (${referrer} => ${target})`);
     } else if (type === 'globalScopeFilter') {
-      const {module} = extras;
-      throw new Error(`Detected disallowed dependence upon "${module}". (${referrer})`);
+      const {globalScope} = extras;
+      throw new Error(`${name}: Detected disallowed dependence upon ${globalScope.map(e => `"${e}"`).join(',')}. (${referrer})`);
     }
     throw new Error(`Encountered unimplemented type, "${type}".`);
   },

@@ -61,13 +61,25 @@ const defaultOptions = {
           const {target} = extras;
           throw new Error(`${name}: Detected a cyclic dependency.  (${referrer} => ${target})`);
         } else if (type === TYPE_GLOBAL_SCOPE_FILTER) {
-          const {module} = extras;
-          throw new Error(`${name}: Detected disallowed dependence upon "${module}". (${referrer})`);
+          const {globalScope} = extras;
+          throw new Error(`${name}: Detected disallowed dependence upon ${globalScope.map(e => `"${e}"`).join(',')}. (${referrer})`);
         }
         throw new Error(`Encountered unimplemented type, "${type}".`);
       },
     },
   },
+};
+
+// Returns the list of dependencies a madged referrer has against a file tree.
+const listDependencies = (moduleFileTree, madged, referrer) => {
+  return [].concat(
+    ...moduleFileTree.map(
+      (currentModuleFile) => madged
+        .depends(path.relative(referrer, currentModuleFile).substring(3))
+        .filter((_, i) => i === 0)
+        .map(() => currentModuleFile),
+    ),
+  );
 };
 
 module.exports.transform = async function anisotropicTransform(src, filename, options) {
@@ -88,6 +100,11 @@ module.exports.transform = async function anisotropicTransform(src, filename, op
 
   const nodeModulesDir = path.resolve(`${appRootPath}`, "node_modules");
   const file = normalize(`${appRootPath}`, filename);
+  const moduleFileTree = [].concat(
+    ...Object.keys(globalScopeFilter).map(module => glob.sync(`${
+      path.resolve(nodeModulesDir, module)
+    }/**/*`)),
+  );
 
   if (isSubDirectory(nodeModulesDir, file)) {
     /* dependency graph */
@@ -96,25 +113,21 @@ module.exports.transform = async function anisotropicTransform(src, filename, op
 
     Object.keys(keys).forEach((key) => {
       const parent = normalize(path.dirname(file), key);
+      const globalScope = listDependencies(moduleFileTree, madged, file);
 
-      Object.keys(globalScopeFilter).forEach((module) => {
-        const moduleDirectoryPath = path.resolve(nodeModulesDir, module);
-        glob.sync(`${moduleDirectoryPath}/**/*`).map((currentModuleFile) => {
-          if (madged.depends(path.relative(file, currentModuleFile).substring(3)).length) {
-            resolve({
-              type: TYPE_GLOBAL_SCOPE_FILTER,
-              referrer: file,
-              module,
-            });
-          }
+      if (globalScope.length) {
+        resolve({
+          type: TYPE_GLOBAL_SCOPE_FILTER,
+          referrer: file,
+          globalScope,
         });
-      });
+      }
 
       if (!isSubDirectory(nodeModulesDir, parent) && !file.match(cyclicDependents)) {
         resolve({
           type: TYPE_CYCLIC_DEPENDENTS,
-          target: parent,
           referrer: file,
+          target: parent,
         });
       }
     });
