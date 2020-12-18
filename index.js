@@ -58,12 +58,7 @@ const defaultOptions = {
       // are permitted to assert such a dependency.
       [TYPE_CYCLIC_DEPENDENTS]: /a^/, /* by default, do not permit anything */
       [TYPE_GLOBAL_SCOPE_FILTER]: {
-        // fetch all files
-        'react-native-keychain': {
-
-        },
-        //// No resolution.
-        //'react-native-keychain/index.js': null, // TODO: determine index dynamically, or populate the contents ourselves
+        'react-native-keychain': {},
       },
       resolve: ({ type, referrer, ...extras }) => {
         if (type === TYPE_CYCLIC_DEPENDENTS) {
@@ -78,7 +73,6 @@ const defaultOptions = {
     },
   },
 };
-
 
 module.exports.transform = async function anisotropicTransform(src, filename, options) {
   if (typeof src === "object") {
@@ -107,16 +101,19 @@ module.exports.transform = async function anisotropicTransform(src, filename, op
     Object.keys(keys).forEach((key) => {
       const parent = normalize(path.dirname(file), key);
 
-      Object.entries(globalScopeFilter).forEach(([maybeDependentUpon, v]) => {
-        const moduleDirectoryPath = path.resolve(nodeModulesDir, maybeDependentUpon);
-        const allFiles = glob.sync(`${moduleDirectoryPath}/**/*`);
-
-        allFiles.map((e) => {
-          if (madged.depends(path.relative(file, e).substring(3)).length) {
-            console.warn('Detected bad dependency', file, 'on', maybeDependentUpon);
+      Object.entries(globalScopeFilter).forEach(([module, v]) => {
+        const moduleDirectoryPath = path.resolve(nodeModulesDir, module);
+        glob.sync(`${moduleDirectoryPath}/**/*`).map((currentModuleFile) => {
+          if (madged.depends(path.relative(file, currentModuleFile).substring(3)).length) {
+            resolve({
+              type: TYPE_GLOBAL_SCOPE_FILTER,
+              referrer: file,
+              module,
+            });
           }
         });
       });
+
       if (!isSubDirectory(nodeModulesDir, parent) && !file.match(cyclicDependents)) {
         resolve({
           type: TYPE_CYCLIC_DEPENDENTS,
