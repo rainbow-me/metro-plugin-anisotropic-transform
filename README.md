@@ -4,9 +4,10 @@
 ## 💪 Motivation
 [`metro-plugin-anisotropic-transform`](.) is a transform plugin for [**React Native**](https://reactnative.dev)'s [**Metro Bundler**](https://github.com/facebook/metro). It is designed to inspect the relationships that exist between dependencies; specifically, those in the `node_modules/` directory which make a cyclic dependence to the root project.
 
-This is designed to circumvent issues where:
-  - Preventing cyclic dependencies on the root project, which can lead to drastically increased installation time.
-  - Derisking the possibility of library dependencies relying upon runtime functionality exported by the root project.
+This transform is designed to fulfill the following functionality:
+  - Suppress cyclic dependencies on the root project, which can lead to drastically increased installation time.
+  - Derisk the possibility of library dependencies relying upon runtime functionality exported by the root project.
+  - Prevent dependencies from squatting on critical functionality exported by other `node_modules`.
 
 ### 🤔 How does it work?
 Applications built using [**React Native**](https://reactnative.dev) are forced to resolve **all** module dependencies at bundle time. This is because unlike the [**Node.js**](https://nodejs.org/en/) ecosystem, the entire dependency map of the compiled application must be resolved prior to app distrbution in order translate into a fixed application bundle that can be transported.
@@ -15,7 +16,6 @@ This makes the following impact on the compilation process:
 
   - Dynamic `require`s are **not currently possible** in [**React Native**](https://reactnative.dev). All attempts to `import` and `require`, even those which have been deferred until execution time,  must be resolved during the bundle phase.
   - The entire scope of an application's module resolution map can be determined and interrogated at bundle time.
-  - We can prevent dependencies from squatting on critical functionality exported by other dependencies.
 
 [`metro-plugin-anisotropic-transform`](.) utilizes these restrictions in library resolution to compare and handle relationships between the core application and children of the `node_modules` directory, and in these cases, resolve appropriately. 
 
