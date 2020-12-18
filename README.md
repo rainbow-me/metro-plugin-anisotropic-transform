@@ -45,6 +45,9 @@ module.exports.transform = function ({
     customTransformOptions: {
       ["metro-plugin-anisotropic-transform"]: {
         cyclicDependents: /.+\/node_modules\/expo\/AppEntry\.js$/,
+        globalScopeFilter: {
+          'react-native-animated-charts': null,
+        },
       },
     },
   });
@@ -57,6 +60,8 @@ module.exports.transform = function ({
 Inside `customTransformOptions`, we declare a child object under the key `metro-plugin-anisotropic-transform` which can be used to specify configuration arguments. In this example, we've defined a simple [`RegExp`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/RegExp) to permit a cyclic dependency on `/node_modules/expo/AppEntry.js`, which is required for [**Expo**](https://expo.io) projects. In this instance, any other dependencies in the `node_modules` directory which does not match this pattern will cause the bundler to fail.
 
 > **Note:** In production environments, it is imported to declare the **full system path** to the resolved dependency. This is because bad actors could exploit a simple directory structure to create a _technically allowable_ path, i.e. `node_modules/evil-dangerous-package/node_modules/expo/AppEntry.js`.
+
+Additionally, we define the `globalScopeFilter` property. This is used to escape any library dependencies from asserting a dependence upon another library in your `node_modules` directory. In this example, the metro bundler will terminate bundling if an included dependency asserts a dependence upon [`react-native-animated-charts`](https://github.com/rainbow-me/react-native-animated-charts).
 
 ### 3. ♾️ Applying the Transform
 
@@ -97,15 +102,22 @@ And that's everything! Now whenever you rebundle your application, your applicat
     includeNpm: true,
     fileExtensions: ["js", "jsx", "ts", "tsx"],
     detectiveOptions: {
-      es6: { mixedImports: true },
+      es6: {
+        mixedImports: true
+      }
     },
   }, 
-  cyclicDependents: /a^/,
-  resolve: ({ type, ...extras }) => {
+  cyclicDependents: /a^/, /* by default, do not permit anything */
+  globalScopeFilter: {}, /* no filtering applied */
+  resolve: ({ type, referrer, ...extras }) => {
     if (type === 'cyclicDependents') {
-      const {target, referrer} = extras;
-      throw new Error(`${name}: Detected a cyclic dependency.  (${referrer} => ${target})`);
+      const {target} = extras;
+      throw new Error(`Detected a cyclic dependency.  (${referrer} => ${target})`);
+    } else if (type === 'globalScopeFilter') {
+      const {module} = extras;
+      throw new Error(`Detected disallowed dependence upon "${module}". (${referrer})`);
     }
+    throw new Error(`Encountered unimplemented type, "${type}".`);
   },
 }
 ```
@@ -116,6 +128,8 @@ Controls invocation of the [`madge`](https://github.com/pahen/madge) tool, which
 ### `cyclicDependents`
 A [`RegExp`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/RegExp) which determines which cyclic dependencies are permitted to exist. By default, none are allowed.
 
+### `globalScopeFilter`
+An object whose keys map to dependencies in your `node_modules` directory which are not permitted to be included by other dependencies. This is useful for preventing libraries from executing potentially priviledged functionality exported by another module.
 
 ### `resolve`
 A function called when the anisotropic platform detects a sensitive relationship. By default, this is configured to `throw` and prevent the bundler from continuing.

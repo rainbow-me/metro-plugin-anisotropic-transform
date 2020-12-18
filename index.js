@@ -54,12 +54,8 @@ const defaultOptions = {
           }
         },
       }, 
-      // Dependencies which depend upon the root project
-      // are permitted to assert such a dependency.
       [TYPE_CYCLIC_DEPENDENTS]: /a^/, /* by default, do not permit anything */
-      [TYPE_GLOBAL_SCOPE_FILTER]: {
-        'react-native-keychain': {},
-      },
+      [TYPE_GLOBAL_SCOPE_FILTER]: {}, /* no filtering applied */
       resolve: ({ type, referrer, ...extras }) => {
         if (type === TYPE_CYCLIC_DEPENDENTS) {
           const {target} = extras;
@@ -101,7 +97,7 @@ module.exports.transform = async function anisotropicTransform(src, filename, op
     Object.keys(keys).forEach((key) => {
       const parent = normalize(path.dirname(file), key);
 
-      Object.entries(globalScopeFilter).forEach(([module, v]) => {
+      Object.keys(globalScopeFilter).forEach((module) => {
         const moduleDirectoryPath = path.resolve(nodeModulesDir, module);
         glob.sync(`${moduleDirectoryPath}/**/*`).map((currentModuleFile) => {
           if (madged.depends(path.relative(file, currentModuleFile).substring(3)).length) {
