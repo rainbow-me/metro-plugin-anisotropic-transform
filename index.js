@@ -91,7 +91,7 @@ const getPackageNameByFilePath = (nodeModulesDir, relative) => {
   return packageName;
 };
 
-// Returns true if a referrer lives within the same module as it's globalScope.
+// Returns an array of inter-package dependencies within the globalScope.
 const getAllowedGlobalScope = (nodeModulesDir, globalScope, referrer) => {
   const pkg = getPackageNameByFilePath(nodeModulesDir, referrer);
   return globalScope.filter(
