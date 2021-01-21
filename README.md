@@ -47,7 +47,7 @@ module.exports.transform = function ({
       ["metro-plugin-anisotropic-transform"]: {
         cyclicDependents: /.+\/node_modules\/expo\/AppEntry\.js$/,
         globalScopeFilter: {
-          'react-native-animated-charts': null,
+          'react-native-animated-charts': {},
         },
       },
     },

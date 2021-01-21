@@ -72,13 +72,30 @@ const defaultOptions = {
 
 // Returns the list of dependencies a madged referrer has against a file tree.
 const listDependencies = (moduleFileTree, madged, referrer) => {
-  return [].concat(
+  return  [].concat(
     ...moduleFileTree.map(
       (currentModuleFile) => madged
         .depends(path.relative(referrer, currentModuleFile).substring(3))
         .filter((_, i) => i === 0)
         .map(() => currentModuleFile),
     ),
+  );
+};
+
+const getPackageNameByFilePath = (nodeModulesDir, relative) => {
+  const arr = relative.substring(`${nodeModulesDir}${path.sep}`.length).split(path.sep);
+  const [packageName, maybePackageSubpath] = arr;
+  if (packageName.startsWith('@')) {
+    return `${packageName}/${maybePackageSubpath}`;
+  }
+  return packageName;
+};
+
+// Returns true if a referrer lives within the same module as it's globalScope.
+const getAllowedGlobalScope = (nodeModulesDir, globalScope, referrer) => {
+  const pkg = getPackageNameByFilePath(nodeModulesDir, referrer);
+  return globalScope.filter(
+    e => getPackageNameByFilePath(nodeModulesDir, e) === pkg
   );
 };
 
@@ -116,11 +133,18 @@ module.exports.transform = async function anisotropicTransform(src, filename, op
       const globalScope = listDependencies(moduleFileTree, madged, file);
 
       if (globalScope.length) {
-        resolve({
-          type: TYPE_GLOBAL_SCOPE_FILTER,
-          referrer: file,
-          globalScope,
-        });
+        const allowedGlobalScope = getAllowedGlobalScope(nodeModulesDir, globalScope, file);
+        const disallowedGlobalScope = globalScope.filter(
+          (maybeDisallowedGlobalScope) =>
+            allowedGlobalScope.indexOf(maybeDisallowedGlobalScope) < 0,
+        );
+        if (disallowedGlobalScope.length) {
+          resolve({
+            type: TYPE_GLOBAL_SCOPE_FILTER,
+            referrer: file,
+            globalScope: disallowedGlobalScope,
+          });
+        }
       }
 
       if (!isSubDirectory(nodeModulesDir, parent) && !file.match(cyclicDependents)) {
