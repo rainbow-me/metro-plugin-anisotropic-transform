@@ -14,7 +14,8 @@ Applications built using [**React Native**](https://reactnative.dev) are forced 
 
 This makes the following impact on the compilation process:
 
-  - Dynamic `require`s are **not currently possible** in [**React Native**](https://reactnative.dev). All attempts to `import` and `require`, even those which have been deferred until execution time,  must be resolved during the bundle phase.
+  - Dynamic `require`s are **not possible** in [**React Native**](https://reactnative.dev) when `inlineRequires` is set to `false`. All attempts to `import` and `require`, even those which have been deferred until execution time, must be resolved during the bundle phase.
+    - Note that it _is_ possible to [dynamically `require` in React Native](https://twitter.com/baconbrix/status/1357448848331988994?s=21), so in order to protect the transform from runtime misuse, `inlineRequires` must be set to `false`.
   - The entire scope of an application's module resolution map can be determined and interrogated at bundle time.
 
 [`metro-plugin-anisotropic-transform`](.) utilizes these restrictions in library resolution to compare and handle relationships between the core application and children of the `node_modules` directory, and in these cases, resolve appropriately. 
@@ -72,6 +73,7 @@ Finally, you'll need to update your `metro.config.js` to invoke the `metro.trans
 module.exports = {
 +  transformer: {
 +    babelTransformerPath: require.resolve("./metro.transform.js"),
++    getTransformOptions: () => ({ inlineRequires: false, allowOptionalDependencies: false }),
 +  },
 };
 ```
