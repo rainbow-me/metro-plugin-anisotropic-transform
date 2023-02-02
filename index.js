@@ -30,7 +30,8 @@ const getUpstreamTransformer = () => {
   }
 };
 
-function isSubDirectory(parent, dir) {
+// basically is a node_module
+function isNodeModule(parent, dir) {
   const relative = path.relative(parent, dir);
   return relative && !relative.startsWith('..') && !path.isAbsolute(relative);
 }
@@ -53,7 +54,7 @@ const defaultOptions = {
             mixedImports: true
           }
         },
-      }, 
+      },
       [TYPE_CYCLIC_DEPENDENTS]: /a^/, /* by default, do not permit anything */
       [TYPE_GLOBAL_SCOPE_FILTER]: {}, /* no filtering applied */
       resolve: ({ type, referrer, ...extras }) => {
@@ -71,7 +72,7 @@ const defaultOptions = {
 };
 
 // Returns the list of dependencies a madged referrer has against a file tree.
-const listDependencies = (moduleFileTree, madged, referrer) => {
+const getModuleDependencies = (moduleFileTree, madged, referrer) => {
   return  [].concat(
     ...moduleFileTree.map(
       (currentModuleFile) => madged
@@ -82,7 +83,7 @@ const listDependencies = (moduleFileTree, madged, referrer) => {
   );
 };
 
-const getPackageNameByFilePath = (nodeModulesDir, relative) => {
+const getPackageNameByFilepath = (nodeModulesDir, relative) => {
   const arr = relative.substring(`${nodeModulesDir}${path.sep}`.length).split(path.sep);
   const [packageName, maybePackageSubpath] = arr;
   if (packageName.startsWith('@')) {
@@ -92,10 +93,10 @@ const getPackageNameByFilePath = (nodeModulesDir, relative) => {
 };
 
 // Returns an array of inter-package dependencies within the globalScope.
-const getAllowedGlobalScope = (nodeModulesDir, globalScope, referrer) => {
-  const pkg = getPackageNameByFilePath(nodeModulesDir, referrer);
+const getAllowedModuleDependenciesForFile = (nodeModulesDir, globalScope, referrer) => {
+  const pkg = getPackageNameByFilepath(nodeModulesDir, referrer);
   return globalScope.filter(
-    e => getPackageNameByFilePath(nodeModulesDir, e) === pkg
+    e => getPackageNameByFilepath(nodeModulesDir, e) === pkg
   );
 };
 
@@ -105,66 +106,68 @@ module.exports.transform = async function anisotropicTransform(src, filename, op
     ({ src, filename, options } = src);
   }
 
-  const opts = deepmerge(defaultOptions, options);
-  const { customTransformOptions } = opts;
-  const { [name]: anisotropicTransformOptions } = customTransformOptions;
+  const { customTransformOptions: { [name]: anisotropicTransformOptions } } = deepmerge(defaultOptions, options);
   const {
     madge: madgeOptions,
     [TYPE_CYCLIC_DEPENDENTS]: cyclicDependents,
-    [TYPE_GLOBAL_SCOPE_FILTER]: globalScopeFilter,
+    [TYPE_GLOBAL_SCOPE_FILTER]: disallowedPackageConfigs,
     resolve,
   } = anisotropicTransformOptions;
 
   const nodeModulesDir = path.resolve(`${appRootPath}`, "node_modules");
-  const file = normalize(`${appRootPath}`, filename);
-  const moduleFileTree = [].concat(
-    ...Object.keys(globalScopeFilter).map(module => glob.sync(`${
+  const absoluteFilepath = normalize(`${appRootPath}`, filename);
+  const allFilesFromDisallowedPackages = [].concat(
+    ...Object.keys(disallowedPackageConfigs).map(module => glob.sync(`${
       path.resolve(nodeModulesDir, module)
     }/**/*`)),
   );
 
-  if (isSubDirectory(nodeModulesDir, file)) {
+  if (isNodeModule(nodeModulesDir, absoluteFilepath)) {
     /* dependency graph */
     const madged = await madge(filename, madgeOptions);
     const keys = madged.obj();
 
     Object.keys(keys).forEach((key) => {
-      const parent = normalize(path.dirname(file), key);
-      const globalScope = listDependencies(moduleFileTree, madged, file);
+      const currentFileTarget = normalize(path.dirname(absoluteFilepath), key);
+      const moduleDependencies = getModuleDependencies(allFilesFromDisallowedPackages, madged, absoluteFilepath);
 
-      if (globalScope.length) {
-        const allowedGlobalScope = getAllowedGlobalScope(nodeModulesDir, globalScope, file);
-        const disallowedGlobalScope = globalScope.filter(
+      if (moduleDependencies.length) {
+        const allowedModuleDependencies = getAllowedModuleDependenciesForFile(nodeModulesDir, moduleDependencies, absoluteFilepath);
+        const disallowedModuleDependencies = moduleDependencies.filter(
           (maybeDisallowedGlobalScope) =>
-            allowedGlobalScope.indexOf(maybeDisallowedGlobalScope) < 0,
+            allowedModuleDependencies.indexOf(maybeDisallowedGlobalScope) < 0,
         );
-        if (disallowedGlobalScope.length) {
-          const packageInError = getPackageNameByFilePath(nodeModulesDir, file)
-          const actuallyDisallowedGlobalScope = []
 
-          for (const disallowed of disallowedGlobalScope) {
-            const disallowedPackage = getPackageNameByFilePath(nodeModulesDir, disallowed);
-            const allowedPackages = globalScopeFilter[disallowedPackage]?.exceptions || [];
-            if (!allowedPackages.includes(packageInError)) {
-              actuallyDisallowedGlobalScope.push(disallowed);
+        if (disallowedModuleDependencies.length) {
+          const packageBlockedFromAccess = getPackageNameByFilepath(nodeModulesDir, absoluteFilepath)
+          const actuallyDisallowedModuleDependencies = []
+
+          for (const disallowedModuleFilepath of disallowedModuleDependencies) {
+            const disallowedPackage = getPackageNameByFilepath(nodeModulesDir, disallowedModuleFilepath);
+            const packageExceptions = disallowedPackageConfigs[disallowedPackage]?.exceptions || [];
+
+            if (!packageExceptions.includes(packageBlockedFromAccess)) {
+              actuallyDisallowedModuleDependencies.push(disallowedModuleFilepath);
             }
           }
 
-          if (actuallyDisallowedGlobalScope.length) {
+          if (actuallyDisallowedModuleDependencies.length) {
             resolve({
               type: TYPE_GLOBAL_SCOPE_FILTER,
-              referrer: file,
-              globalScope: actuallyDisallowedGlobalScope,
+              referrer: absoluteFilepath,
+              globalScope: actuallyDisallowedModuleDependencies,
             });
           }
         }
       }
 
-      if (!isSubDirectory(nodeModulesDir, parent) && !file.match(cyclicDependents)) {
+      // If a node module depends on a NON-node module i.e. in user-land
+      // project, then restrict it unless we have an exception.
+      if (!isNodeModule(nodeModulesDir, currentFileTarget) && !absoluteFilepath.match(cyclicDependents)) {
         resolve({
           type: TYPE_CYCLIC_DEPENDENTS,
-          referrer: file,
-          target: parent,
+          referrer: absoluteFilepath,
+          target: currentFileTarget,
         });
       }
     });
@@ -172,4 +175,3 @@ module.exports.transform = async function anisotropicTransform(src, filename, op
 
   return getUpstreamTransformer().transform({ src, filename, options });
 };
-
