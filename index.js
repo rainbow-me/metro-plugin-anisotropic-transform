@@ -4,48 +4,14 @@ const madge = require("madge");
 const appRootPath = require("app-root-path");
 const deepmerge = require("deepmerge");
 const glob = require("glob");
-
-const { name } = require("./package.json");
-const { version } = require("react-native/package.json");
-const reactNativeMinorVersion = minor(version);
-
-const upstreamTransformer = (() => {
-  if (reactNativeMinorVersion >= 59) {
-    return require("metro-react-native-babel-transformer");
-  } else if (reactNativeMinorVersion >= 56) {
-    return require("metro/src/reactNativeTransformer");
-  } else if (reactNativeMinorVersion >= 52) {
-    return require("metro/src/transformer");
-  } else if (reactNativeMinorVersion >= 47) {
-    return require("metro-bundler/src/transformer");
-  } else if (reactNativeMinorVersion === 46) {
-    return require("metro-bundler/build/transformer");
-  } else {
-    // handle RN <= 0.45
-    const oldUpstreamTransformer = require("react-native/packager/transformer");
-    return {
-      transform: ({ src, filename, options }) =>
-      oldUpstreamTransformer.transform(src, filename, options),
-    };
-  }
-})();
-
-// basically is a node_module
-function isNodeModule(parent, dir) {
-  const relative = path.relative(parent, dir);
-  return relative && !relative.startsWith('..') && !path.isAbsolute(relative);
-}
-
-function normalize(parent, child) {
-  return path.normalize(`${parent}${path.sep}${child}`);
-}
+const { version: RN_VERSION } = require("react-native/package.json");
+const { name: PACKAGE_NAME } = require("./package.json");
 
 const TYPE_CYCLIC_DEPENDENTS = 'cyclicDependents';
 const TYPE_GLOBAL_SCOPE_FILTER = 'globalScopeFilter';
-
 const defaultOptions = {
   customTransformOptions: {
-    [name]: {
+    [PACKAGE_NAME]: {
       madge: {
         includeNpm: true,
         fileExtensions: ["js", "jsx", "ts", "tsx"],
@@ -60,19 +26,50 @@ const defaultOptions = {
       resolve: ({ type, referrer, ...extras }) => {
         if (type === TYPE_CYCLIC_DEPENDENTS) {
           const {target} = extras;
-          throw new Error(`${name}: Detected a cyclic dependency.  (${referrer} => ${target})`);
+          throw new Error(`${PACKAGE_NAME}: Detected a cyclic dependency.  (${referrer} => ${target})`);
         } else if (type === TYPE_GLOBAL_SCOPE_FILTER) {
           const {globalScope} = extras;
-          throw new Error(`${name}: Detected disallowed dependence upon ${globalScope.map(e => `"${e}"`).join(',')}. (${referrer})`);
+          throw new Error(`${PACKAGE_NAME}: Detected disallowed dependence upon ${globalScope.map(e => `"${e}"`).join(',')}. (${referrer})`);
         }
         throw new Error(`Encountered unimplemented type, "${type}".`);
       },
     },
   },
 };
+const upstreamTransformer = (() => {
+  const RN_MINOR_VERSION = minor(RN_VERSION);
+
+  if (RN_MINOR_VERSION >= 59) {
+    return require("metro-react-native-babel-transformer");
+  } else if (RN_MINOR_VERSION >= 56) {
+    return require("metro/src/reactNativeTransformer");
+  } else if (RN_MINOR_VERSION >= 52) {
+    return require("metro/src/transformer");
+  } else if (RN_MINOR_VERSION >= 47) {
+    return require("metro-bundler/src/transformer");
+  } else if (RN_MINOR_VERSION === 46) {
+    return require("metro-bundler/build/transformer");
+  } else {
+    // handle RN <= 0.45
+    const oldUpstreamTransformer = require("react-native/packager/transformer");
+    return {
+      transform: ({ src, filename, options }) =>
+      oldUpstreamTransformer.transform(src, filename, options),
+    };
+  }
+})();
+
+function isNodeModule(parent, dir) {
+  const relative = path.relative(parent, dir);
+  return relative && !relative.startsWith('..') && !path.isAbsolute(relative);
+}
+
+function normalize(parent, child) {
+  return path.normalize(`${parent}${path.sep}${child}`);
+}
 
 // Returns the list of dependencies a madged referrer has against a file tree.
-const getModuleDependencies = (moduleFileTree, madged, referrer) => {
+function getModuleDependencies (moduleFileTree, madged, referrer) {
   return  [].concat(
     ...moduleFileTree.map(
       (currentModuleFile) => madged
@@ -83,7 +80,7 @@ const getModuleDependencies = (moduleFileTree, madged, referrer) => {
   );
 };
 
-const getPackageNameByFilepath = (nodeModulesDir, relative) => {
+function getPackageNameByFilepath (nodeModulesDir, relative) {
   const arr = relative.substring(`${nodeModulesDir}${path.sep}`.length).split(path.sep);
   const [packageName, maybePackageSubpath] = arr;
   if (packageName.startsWith('@')) {
@@ -93,7 +90,7 @@ const getPackageNameByFilepath = (nodeModulesDir, relative) => {
 };
 
 // Returns an array of inter-package dependencies within the globalScope.
-const getAllowedModuleDependenciesForFile = (nodeModulesDir, globalScope, referrer) => {
+function getAllowedModuleDependenciesForFile (nodeModulesDir, globalScope, referrer) {
   const pkg = getPackageNameByFilepath(nodeModulesDir, referrer);
   return globalScope.filter(
     e => getPackageNameByFilepath(nodeModulesDir, e) === pkg
@@ -106,7 +103,7 @@ module.exports.transform = async function anisotropicTransform(src, filename, op
     ({ src, filename, options } = src);
   }
 
-  const { customTransformOptions: { [name]: anisotropicTransformOptions } } = deepmerge(defaultOptions, options);
+  const { customTransformOptions: { [PACKAGE_NAME]: anisotropicTransformOptions } } = deepmerge(defaultOptions, options);
   const {
     madge: madgeOptions,
     [TYPE_CYCLIC_DEPENDENTS]: cyclicDependents,
