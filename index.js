@@ -139,11 +139,24 @@ module.exports.transform = async function anisotropicTransform(src, filename, op
             allowedGlobalScope.indexOf(maybeDisallowedGlobalScope) < 0,
         );
         if (disallowedGlobalScope.length) {
-          resolve({
-            type: TYPE_GLOBAL_SCOPE_FILTER,
-            referrer: file,
-            globalScope: disallowedGlobalScope,
-          });
+          const packageInError = getPackageNameByFilePath(nodeModulesDir, file)
+          const actuallyDisallowedGlobalScope = []
+
+          for (const disallowed of disallowedGlobalScope) {
+            const disallowedPackage = getPackageNameByFilePath(nodeModulesDir, disallowed);
+            const allowedPackages = globalScopeFilter[disallowedPackage]?.exceptions || [];
+            if (!allowedPackages.includes(packageInError)) {
+              actuallyDisallowedGlobalScope.push(disallowed);
+            }
+          }
+
+          if (actuallyDisallowedGlobalScope.length) {
+            resolve({
+              type: TYPE_GLOBAL_SCOPE_FILTER,
+              referrer: file,
+              globalScope: actuallyDisallowedGlobalScope,
+            });
+          }
         }
       }
 
