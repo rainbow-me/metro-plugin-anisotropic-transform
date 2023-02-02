@@ -9,7 +9,7 @@ const { name } = require("./package.json");
 const { version } = require("react-native/package.json");
 const reactNativeMinorVersion = minor(version);
 
-const getUpstreamTransformer = () => {
+const upstreamTransformer = (() => {
   if (reactNativeMinorVersion >= 59) {
     return require("metro-react-native-babel-transformer");
   } else if (reactNativeMinorVersion >= 56) {
@@ -28,7 +28,7 @@ const getUpstreamTransformer = () => {
       oldUpstreamTransformer.transform(src, filename, options),
     };
   }
-};
+})();
 
 // basically is a node_module
 function isNodeModule(parent, dir) {
@@ -173,5 +173,5 @@ module.exports.transform = async function anisotropicTransform(src, filename, op
     });
   }
 
-  return getUpstreamTransformer().transform({ src, filename, options });
+  return upstreamTransformer.transform({ src, filename, options });
 };
