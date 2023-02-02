@@ -7,8 +7,8 @@ const glob = require("glob");
 const { version: RN_VERSION } = require("react-native/package.json");
 const { name: PACKAGE_NAME } = require("./package.json");
 
-const TYPE_CYCLIC_DEPENDENTS = 'cyclicDependents';
-const TYPE_GLOBAL_SCOPE_FILTER = 'globalScopeFilter';
+const TYPE_CYCLIC_DEPENDENTS = "cyclicDependents";
+const TYPE_GLOBAL_SCOPE_FILTER = "globalScopeFilter";
 const defaultOptions = {
   customTransformOptions: {
     [PACKAGE_NAME]: {
@@ -17,19 +17,25 @@ const defaultOptions = {
         fileExtensions: ["js", "jsx", "ts", "tsx"],
         detectiveOptions: {
           es6: {
-            mixedImports: true
-          }
+            mixedImports: true,
+          },
         },
       },
-      [TYPE_CYCLIC_DEPENDENTS]: /a^/, /* by default, do not permit anything */
-      [TYPE_GLOBAL_SCOPE_FILTER]: {}, /* no filtering applied */
+      [TYPE_CYCLIC_DEPENDENTS]: /a^/ /* by default, do not permit anything */,
+      [TYPE_GLOBAL_SCOPE_FILTER]: {} /* no filtering applied */,
       resolve: ({ type, referrer, ...extras }) => {
         if (type === TYPE_CYCLIC_DEPENDENTS) {
-          const {target} = extras;
-          throw new Error(`${PACKAGE_NAME}: Detected a cyclic dependency.  (${referrer} => ${target})`);
+          const { target } = extras;
+          throw new Error(
+            `${PACKAGE_NAME}: Detected a cyclic dependency.  (${referrer} => ${target})`
+          );
         } else if (type === TYPE_GLOBAL_SCOPE_FILTER) {
-          const {globalScope} = extras;
-          throw new Error(`${PACKAGE_NAME}: Detected disallowed dependence upon ${globalScope.map(e => `"${e}"`).join(',')}. (${referrer})`);
+          const { globalScope } = extras;
+          throw new Error(
+            `${PACKAGE_NAME}: Detected disallowed dependence upon ${globalScope
+              .map((e) => `"${e}"`)
+              .join(",")}. (${referrer})`
+          );
         }
         throw new Error(`Encountered unimplemented type, "${type}".`);
       },
@@ -54,14 +60,14 @@ const upstreamTransformer = (() => {
     const oldUpstreamTransformer = require("react-native/packager/transformer");
     return {
       transform: ({ src, filename, options }) =>
-      oldUpstreamTransformer.transform(src, filename, options),
+        oldUpstreamTransformer.transform(src, filename, options),
     };
   }
 })();
 
 function isNodeModule(parent, dir) {
   const relative = path.relative(parent, dir);
-  return relative && !relative.startsWith('..') && !path.isAbsolute(relative);
+  return relative && !relative.startsWith("..") && !path.isAbsolute(relative);
 }
 
 function normalize(parent, child) {
@@ -69,41 +75,53 @@ function normalize(parent, child) {
 }
 
 // Returns the list of dependencies a madged referrer has against a file tree.
-function getModuleDependencies (moduleFileTree, madged, referrer) {
-  return  [].concat(
-    ...moduleFileTree.map(
-      (currentModuleFile) => madged
+function getModuleDependencies(moduleFileTree, madged, referrer) {
+  return [].concat(
+    ...moduleFileTree.map((currentModuleFile) =>
+      madged
         .depends(path.relative(referrer, currentModuleFile).substring(3))
         .filter((_, i) => i === 0)
-        .map(() => currentModuleFile),
-    ),
+        .map(() => currentModuleFile)
+    )
   );
-};
+}
 
-function getPackageNameByFilepath (nodeModulesDir, relative) {
-  const arr = relative.substring(`${nodeModulesDir}${path.sep}`.length).split(path.sep);
+function getPackageNameByFilepath(nodeModulesDir, relative) {
+  const arr = relative
+    .substring(`${nodeModulesDir}${path.sep}`.length)
+    .split(path.sep);
   const [packageName, maybePackageSubpath] = arr;
-  if (packageName.startsWith('@')) {
+  if (packageName.startsWith("@")) {
     return `${packageName}/${maybePackageSubpath}`;
   }
   return packageName;
-};
+}
 
 // Returns an array of inter-package dependencies within the globalScope.
-function getAllowedModuleDependenciesForFile (nodeModulesDir, globalScope, referrer) {
+function getAllowedModuleDependenciesForFile(
+  nodeModulesDir,
+  globalScope,
+  referrer
+) {
   const pkg = getPackageNameByFilepath(nodeModulesDir, referrer);
   return globalScope.filter(
-    e => getPackageNameByFilepath(nodeModulesDir, e) === pkg
+    (e) => getPackageNameByFilepath(nodeModulesDir, e) === pkg
   );
-};
+}
 
-module.exports.transform = async function anisotropicTransform(src, filename, options) {
+module.exports.transform = async function anisotropicTransform(
+  src,
+  filename,
+  options
+) {
   if (typeof src === "object") {
     // handle RN >= 0.46
     ({ src, filename, options } = src);
   }
 
-  const { customTransformOptions: { [PACKAGE_NAME]: anisotropicTransformOptions } } = deepmerge(defaultOptions, options);
+  const {
+    customTransformOptions: { [PACKAGE_NAME]: anisotropicTransformOptions },
+  } = deepmerge(defaultOptions, options);
   const {
     madge: madgeOptions,
     [TYPE_CYCLIC_DEPENDENTS]: cyclicDependents,
@@ -114,9 +132,9 @@ module.exports.transform = async function anisotropicTransform(src, filename, op
   const nodeModulesDir = path.resolve(`${appRootPath}`, "node_modules");
   const absoluteFilepath = normalize(`${appRootPath}`, filename);
   const allFilesFromDisallowedPackages = [].concat(
-    ...Object.keys(disallowedPackageConfigs).map(module => glob.sync(`${
-      path.resolve(nodeModulesDir, module)
-    }/**/*`)),
+    ...Object.keys(disallowedPackageConfigs).map((module) =>
+      glob.sync(`${path.resolve(nodeModulesDir, module)}/**/*`)
+    )
   );
 
   if (isNodeModule(nodeModulesDir, absoluteFilepath)) {
@@ -126,25 +144,42 @@ module.exports.transform = async function anisotropicTransform(src, filename, op
 
     Object.keys(keys).forEach((key) => {
       const currentFileTarget = normalize(path.dirname(absoluteFilepath), key);
-      const moduleDependencies = getModuleDependencies(allFilesFromDisallowedPackages, madged, absoluteFilepath);
+      const moduleDependencies = getModuleDependencies(
+        allFilesFromDisallowedPackages,
+        madged,
+        absoluteFilepath
+      );
 
       if (moduleDependencies.length) {
-        const allowedModuleDependencies = getAllowedModuleDependenciesForFile(nodeModulesDir, moduleDependencies, absoluteFilepath);
+        const allowedModuleDependencies = getAllowedModuleDependenciesForFile(
+          nodeModulesDir,
+          moduleDependencies,
+          absoluteFilepath
+        );
         const disallowedModuleDependencies = moduleDependencies.filter(
           (maybeDisallowedGlobalScope) =>
-            allowedModuleDependencies.indexOf(maybeDisallowedGlobalScope) < 0,
+            allowedModuleDependencies.indexOf(maybeDisallowedGlobalScope) < 0
         );
 
         if (disallowedModuleDependencies.length) {
-          const packageBlockedFromAccess = getPackageNameByFilepath(nodeModulesDir, absoluteFilepath)
-          const actuallyDisallowedModuleDependencies = []
+          const packageBlockedFromAccess = getPackageNameByFilepath(
+            nodeModulesDir,
+            absoluteFilepath
+          );
+          const actuallyDisallowedModuleDependencies = [];
 
           for (const disallowedModuleFilepath of disallowedModuleDependencies) {
-            const disallowedPackage = getPackageNameByFilepath(nodeModulesDir, disallowedModuleFilepath);
-            const packageExceptions = disallowedPackageConfigs[disallowedPackage]?.exceptions || [];
+            const disallowedPackage = getPackageNameByFilepath(
+              nodeModulesDir,
+              disallowedModuleFilepath
+            );
+            const packageExceptions =
+              disallowedPackageConfigs[disallowedPackage]?.exceptions || [];
 
             if (!packageExceptions.includes(packageBlockedFromAccess)) {
-              actuallyDisallowedModuleDependencies.push(disallowedModuleFilepath);
+              actuallyDisallowedModuleDependencies.push(
+                disallowedModuleFilepath
+              );
             }
           }
 
@@ -160,7 +195,10 @@ module.exports.transform = async function anisotropicTransform(src, filename, op
 
       // If a node module depends on a NON-node module i.e. in user-land
       // project, then restrict it unless we have an exception.
-      if (!isNodeModule(nodeModulesDir, currentFileTarget) && !absoluteFilepath.match(cyclicDependents)) {
+      if (
+        !isNodeModule(nodeModulesDir, currentFileTarget) &&
+        !absoluteFilepath.match(cyclicDependents)
+      ) {
         resolve({
           type: TYPE_CYCLIC_DEPENDENTS,
           referrer: absoluteFilepath,
