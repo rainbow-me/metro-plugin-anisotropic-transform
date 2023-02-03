@@ -4,159 +4,209 @@ const madge = require("madge");
 const appRootPath = require("app-root-path");
 const deepmerge = require("deepmerge");
 const glob = require("glob");
+const { version: RN_VERSION } = require("react-native/package.json");
+const { name: PACKAGE_NAME } = require("./package.json");
 
-const { name } = require("./package.json");
-const { version } = require("react-native/package.json");
-const reactNativeMinorVersion = minor(version);
-
-const getUpstreamTransformer = () => {
-  if (reactNativeMinorVersion >= 59) {
-    return require("metro-react-native-babel-transformer");
-  } else if (reactNativeMinorVersion >= 56) {
-    return require("metro/src/reactNativeTransformer");
-  } else if (reactNativeMinorVersion >= 52) {
-    return require("metro/src/transformer");
-  } else if (reactNativeMinorVersion >= 47) {
-    return require("metro-bundler/src/transformer");
-  } else if (reactNativeMinorVersion === 46) {
-    return require("metro-bundler/build/transformer");
-  } else {
-    // handle RN <= 0.45
-    const oldUpstreamTransformer = require("react-native/packager/transformer");
-    return {
-      transform: ({ src, filename, options }) =>
-      oldUpstreamTransformer.transform(src, filename, options),
-    };
-  }
-};
-
-function isSubDirectory(parent, dir) {
-  const relative = path.relative(parent, dir);
-  return relative && !relative.startsWith('..') && !path.isAbsolute(relative);
-}
-
-function normalize(parent, child) {
-  return path.normalize(`${parent}${path.sep}${child}`);
-}
-
-const TYPE_CYCLIC_DEPENDENTS = 'cyclicDependents';
-const TYPE_GLOBAL_SCOPE_FILTER = 'globalScopeFilter';
-
+const TYPE_CYCLIC_DEPENDENTS = "cyclicDependents";
+const TYPE_GLOBAL_SCOPE_FILTER = "globalScopeFilter";
 const defaultOptions = {
   customTransformOptions: {
-    [name]: {
+    [PACKAGE_NAME]: {
       madge: {
         includeNpm: true,
         fileExtensions: ["js", "jsx", "ts", "tsx"],
         detectiveOptions: {
           es6: {
-            mixedImports: true
-          }
+            mixedImports: true,
+          },
         },
-      }, 
-      [TYPE_CYCLIC_DEPENDENTS]: /a^/, /* by default, do not permit anything */
-      [TYPE_GLOBAL_SCOPE_FILTER]: {}, /* no filtering applied */
+      },
+      [TYPE_CYCLIC_DEPENDENTS]: /a^/ /* by default, do not permit anything */,
+      [TYPE_GLOBAL_SCOPE_FILTER]: {} /* no filtering applied */,
       resolve: ({ type, referrer, ...extras }) => {
         if (type === TYPE_CYCLIC_DEPENDENTS) {
-          const {target} = extras;
-          throw new Error(`${name}: Detected a cyclic dependency.  (${referrer} => ${target})`);
+          const { target } = extras;
+          throw new Error(
+            `${PACKAGE_NAME}: Detected a cyclic dependency.  (${referrer} => ${target})`
+          );
         } else if (type === TYPE_GLOBAL_SCOPE_FILTER) {
-          const {globalScope} = extras;
-          throw new Error(`${name}: Detected disallowed dependence upon ${globalScope.map(e => `"${e}"`).join(',')}. (${referrer})`);
+          const { globalScope } = extras;
+          throw new Error(
+            `${PACKAGE_NAME}: Detected disallowed dependence upon ${globalScope
+              .map((e) => `"${e}"`)
+              .join(",")}. (${referrer})`
+          );
         }
         throw new Error(`Encountered unimplemented type, "${type}".`);
       },
     },
   },
 };
+const upstreamTransformer = (() => {
+  const RN_MINOR_VERSION = minor(RN_VERSION);
+
+  if (RN_MINOR_VERSION >= 59) {
+    return require("metro-react-native-babel-transformer");
+  } else if (RN_MINOR_VERSION >= 56) {
+    return require("metro/src/reactNativeTransformer");
+  } else if (RN_MINOR_VERSION >= 52) {
+    return require("metro/src/transformer");
+  } else if (RN_MINOR_VERSION >= 47) {
+    return require("metro-bundler/src/transformer");
+  } else if (RN_MINOR_VERSION === 46) {
+    return require("metro-bundler/build/transformer");
+  } else {
+    // handle RN <= 0.45
+    const oldUpstreamTransformer = require("react-native/packager/transformer");
+    return {
+      transform: ({ src, filename, options }) =>
+        oldUpstreamTransformer.transform(src, filename, options),
+    };
+  }
+})();
+
+function isNodeModule(parent, dir) {
+  const relative = path.relative(parent, dir);
+  return relative && !relative.startsWith("..") && !path.isAbsolute(relative);
+}
+
+function normalize(parent, child) {
+  return path.normalize(`${parent}${path.sep}${child}`);
+}
 
 // Returns the list of dependencies a madged referrer has against a file tree.
-const listDependencies = (moduleFileTree, madged, referrer) => {
-  return  [].concat(
-    ...moduleFileTree.map(
-      (currentModuleFile) => madged
+function getModuleDependencies(moduleFileTree, madged, referrer) {
+  return [].concat(
+    ...moduleFileTree.map((currentModuleFile) =>
+      madged
         .depends(path.relative(referrer, currentModuleFile).substring(3))
         .filter((_, i) => i === 0)
-        .map(() => currentModuleFile),
-    ),
+        .map(() => currentModuleFile)
+    )
   );
-};
+}
 
-const getPackageNameByFilePath = (nodeModulesDir, relative) => {
-  const arr = relative.substring(`${nodeModulesDir}${path.sep}`.length).split(path.sep);
+function getPackageNameByFilepath(nodeModulesDir, relative) {
+  const arr = relative
+    .substring(`${nodeModulesDir}${path.sep}`.length)
+    .split(path.sep);
   const [packageName, maybePackageSubpath] = arr;
-  if (packageName.startsWith('@')) {
+  if (packageName.startsWith("@")) {
     return `${packageName}/${maybePackageSubpath}`;
   }
   return packageName;
-};
+}
 
 // Returns an array of inter-package dependencies within the globalScope.
-const getAllowedGlobalScope = (nodeModulesDir, globalScope, referrer) => {
-  const pkg = getPackageNameByFilePath(nodeModulesDir, referrer);
+function getAllowedModuleDependenciesForFile(
+  nodeModulesDir,
+  globalScope,
+  referrer
+) {
+  const pkg = getPackageNameByFilepath(nodeModulesDir, referrer);
   return globalScope.filter(
-    e => getPackageNameByFilePath(nodeModulesDir, e) === pkg
+    (e) => getPackageNameByFilepath(nodeModulesDir, e) === pkg
   );
-};
+}
 
-module.exports.transform = async function anisotropicTransform(src, filename, options) {
+module.exports.transform = async function anisotropicTransform(
+  src,
+  filename,
+  options
+) {
   if (typeof src === "object") {
     // handle RN >= 0.46
     ({ src, filename, options } = src);
   }
 
-  const opts = deepmerge(defaultOptions, options);
-  const { customTransformOptions } = opts;
-  const { [name]: anisotropicTransformOptions } = customTransformOptions;
+  const {
+    customTransformOptions: { [PACKAGE_NAME]: anisotropicTransformOptions },
+  } = deepmerge(defaultOptions, options);
   const {
     madge: madgeOptions,
     [TYPE_CYCLIC_DEPENDENTS]: cyclicDependents,
-    [TYPE_GLOBAL_SCOPE_FILTER]: globalScopeFilter,
+    [TYPE_GLOBAL_SCOPE_FILTER]: disallowedPackageConfigs,
     resolve,
   } = anisotropicTransformOptions;
 
   const nodeModulesDir = path.resolve(`${appRootPath}`, "node_modules");
-  const file = normalize(`${appRootPath}`, filename);
-  const moduleFileTree = [].concat(
-    ...Object.keys(globalScopeFilter).map(module => glob.sync(`${
-      path.resolve(nodeModulesDir, module)
-    }/**/*`)),
+  const absoluteFilepath = normalize(`${appRootPath}`, filename);
+  const allFilesFromDisallowedPackages = [].concat(
+    ...Object.keys(disallowedPackageConfigs).map((module) =>
+      glob.sync(`${path.resolve(nodeModulesDir, module)}/**/*`)
+    )
   );
 
-  if (isSubDirectory(nodeModulesDir, file)) {
+  if (isNodeModule(nodeModulesDir, absoluteFilepath)) {
     /* dependency graph */
     const madged = await madge(filename, madgeOptions);
     const keys = madged.obj();
 
     Object.keys(keys).forEach((key) => {
-      const parent = normalize(path.dirname(file), key);
-      const globalScope = listDependencies(moduleFileTree, madged, file);
+      const currentFileTarget = normalize(path.dirname(absoluteFilepath), key);
+      const moduleDependencies = getModuleDependencies(
+        allFilesFromDisallowedPackages,
+        madged,
+        absoluteFilepath
+      );
 
-      if (globalScope.length) {
-        const allowedGlobalScope = getAllowedGlobalScope(nodeModulesDir, globalScope, file);
-        const disallowedGlobalScope = globalScope.filter(
-          (maybeDisallowedGlobalScope) =>
-            allowedGlobalScope.indexOf(maybeDisallowedGlobalScope) < 0,
+      if (moduleDependencies.length) {
+        const allowedModuleDependencies = getAllowedModuleDependenciesForFile(
+          nodeModulesDir,
+          moduleDependencies,
+          absoluteFilepath
         );
-        if (disallowedGlobalScope.length) {
-          resolve({
-            type: TYPE_GLOBAL_SCOPE_FILTER,
-            referrer: file,
-            globalScope: disallowedGlobalScope,
-          });
+        const disallowedModuleDependencies = moduleDependencies.filter(
+          (maybeDisallowedGlobalScope) =>
+            allowedModuleDependencies.indexOf(maybeDisallowedGlobalScope) < 0
+        );
+
+        if (disallowedModuleDependencies.length) {
+          const packageBlockedFromAccess = getPackageNameByFilepath(
+            nodeModulesDir,
+            absoluteFilepath
+          );
+          const actuallyDisallowedModuleDependencies = [];
+
+          for (const disallowedModuleFilepath of disallowedModuleDependencies) {
+            const disallowedPackage = getPackageNameByFilepath(
+              nodeModulesDir,
+              disallowedModuleFilepath
+            );
+            const packageExceptions =
+              disallowedPackageConfigs[disallowedPackage]?.exceptions || [];
+
+            if (!packageExceptions.includes(packageBlockedFromAccess)) {
+              actuallyDisallowedModuleDependencies.push(
+                disallowedModuleFilepath
+              );
+            }
+          }
+
+          if (actuallyDisallowedModuleDependencies.length) {
+            resolve({
+              type: TYPE_GLOBAL_SCOPE_FILTER,
+              referrer: absoluteFilepath,
+              globalScope: actuallyDisallowedModuleDependencies,
+            });
+          }
         }
       }
 
-      if (!isSubDirectory(nodeModulesDir, parent) && !file.match(cyclicDependents)) {
+      // If a node module depends on a NON-node module i.e. in user-land
+      // project, then restrict it unless we have an exception.
+      if (
+        !isNodeModule(nodeModulesDir, currentFileTarget) &&
+        !absoluteFilepath.match(cyclicDependents)
+      ) {
         resolve({
           type: TYPE_CYCLIC_DEPENDENTS,
-          referrer: file,
-          target: parent,
+          referrer: absoluteFilepath,
+          target: currentFileTarget,
         });
       }
     });
   }
 
-  return getUpstreamTransformer().transform({ src, filename, options });
+  return upstreamTransformer.transform({ src, filename, options });
 };
-
