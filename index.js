@@ -45,7 +45,9 @@ const defaultOptions = {
 const upstreamTransformer = (() => {
   const RN_MINOR_VERSION = minor(RN_VERSION);
 
-  if (RN_MINOR_VERSION >= 59) {
+  if (RN_MINOR_VERSION >= 73) {
+    return require("@react-native/metro-babel-transformer");
+  } else if (RN_MINOR_VERSION >= 59) {
     return require("metro-react-native-babel-transformer");
   } else if (RN_MINOR_VERSION >= 56) {
     return require("metro/src/reactNativeTransformer");
